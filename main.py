@@ -15,7 +15,7 @@ if not VAULT_PATH_STR:
 VAULT_PATH = Path(VAULT_PATH_STR)
 
 # Create an MCP server
-mcp = FastMCP("Demo", json_response=True)
+mcp = FastMCP("Notes", json_response=True)
 
 def ensure_path():
     if not VAULT_PATH.exists():
