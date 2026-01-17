@@ -91,6 +91,50 @@ Here are the raw notes:
 {raw_notes}
 """
 
+@mcp.tool()
+def search_notes(query: str) -> str:
+    """
+    Searches notes based on a specific query string
+    """
+    ensure_path()
+    matches = []
+    for path in VAULT_PATH.rglob("*.md"):
+        try:
+            if query.lower() in path.read_text(encoding="utf-8").lower():
+                matches.append(str(path.relative_to(VAULT_PATH)))
+        except Exception:
+            continue
+    return "\n".join(matches) if matches else "No matches found."
+
+@mcp.tool()
+def list_notes(folder: str = ".") -> str:
+    """
+    Lists all notes files
+    """
+    ensure_path()
+    target_dir = VAULT_PATH / folder
+    if not target_dir.exists():
+        return "Folder not found."
+    
+    files = [p.name for p in target_dir.glob("*.md")]
+    return "\n".join(files)
+
+@mcp.tool()
+def append_to_note(filename: str, content: str) -> str:
+    """
+    Adds text to the end an existing note
+    """
+    ensure_path()
+    if not filename.endswith(".md"): filename += ".md"
+    note_path = VAULT_PATH / filename
+    
+    if not note_path.exists():
+        return "Note doesn't exist"
+        
+    with open(note_path, "a", encoding="utf-8") as f:
+        f.write("\n" + content)
+    return f"Appended to {filename}"
+
 # Run with streamable HTTP transport
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
