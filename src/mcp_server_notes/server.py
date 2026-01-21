@@ -1,26 +1,8 @@
 from mcp.server.fastmcp import FastMCP
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# env setup
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
-VAULT_PATH_STR = os.getenv("OBSIDIAN_VAULT_PATH")
-
-if not VAULT_PATH_STR:
-    raise ValueError("OBSIDIAN_VAULT_PATH not found in .env file")
-    
-VAULT_PATH = Path(VAULT_PATH_STR)
+from .config import VAULT_PATH, ensure_path
 
 # Create an MCP server
 mcp = FastMCP("Notes", json_response=True)
-
-def ensure_path():
-    if not VAULT_PATH.exists():
-        raise RuntimeError(f"The vault at {VAULT_PATH} does not exist")
-    return VAULT_PATH
 
 # create resource to access notes
 @mcp.resource("obsidian://{note_name}")
@@ -134,7 +116,3 @@ def append_to_note(filename: str, content: str) -> str:
     with open(note_path, "a", encoding="utf-8") as f:
         f.write("\n" + content)
     return f"Appended to {filename}"
-
-# Run with streamable HTTP transport
-if __name__ == "__main__":
-    mcp.run(transport="streamable-http")

@@ -1,10 +1,17 @@
 [project]
-name = "mcp-test"
+name = "mcp-server-notes"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Multi-Protocol Context Server for Obsidian Notes"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.25.0",
     "python-dotenv>=1.2.1",
 ]
+
+[project.scripts]
+mcp-server-notes = "mcp_server_notes:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

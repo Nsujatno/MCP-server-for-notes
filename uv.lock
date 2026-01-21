@@ -321,9 +321,9 @@ cli = [
 ]
 
 [[package]]
-name = "mcp-test"
+name = "mcp-server-notes"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "python-dotenv" },
