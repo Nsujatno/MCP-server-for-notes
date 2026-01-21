@@ -46,6 +46,8 @@ def create_note(filename: str, content: str) -> str:
         if note_path.exists():
             return f"Error: A note named '{filename}' already exists."
         
+        note_path.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(note_path, "w", encoding="utf-8") as f:
             f.write(content)
         
@@ -98,8 +100,14 @@ def list_notes(folder: str = ".") -> str:
     if not target_dir.exists():
         return "Folder not found."
     
-    files = [p.name for p in target_dir.glob("*.md")]
-    return "\n".join(files)
+    files = []
+    for p in target_dir.iterdir():
+        if p.is_dir():
+            files.append(f"[DIR] {p.name}")
+        elif p.suffix == ".md":
+            files.append(p.name)
+            
+    return "\n".join(sorted(files))
 
 @mcp.tool()
 def append_to_note(filename: str, content: str) -> str:
