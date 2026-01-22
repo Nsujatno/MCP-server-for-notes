@@ -69,7 +69,8 @@ Please perform the following steps:
 1. Analyze the raw text below.
 2. Reformat it into clean Markdown. Use headers (##), bullet points, bold text for key terms, use $$ for math equations, and use `` for any code blocks.
 3. Summarize the main points at the very top.
-4. Call the 'create_note' tool to save this content to my vault with filename: "{filename}" and the content: the formatted markdown.
+4. For any parts that say "claude help me", or "claude expand on this", explain more about the information.
+5. Call the 'create_note' tool to save this content to my vault with filename: "{filename}" and the content: the formatted markdown.
 
 Here are the raw notes:
 {raw_notes}
