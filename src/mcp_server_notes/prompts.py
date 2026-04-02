@@ -59,6 +59,7 @@ Scan the conversation and extract only what's worth persisting long-term. Be rut
 - Things I already knew before this conversation started
 - Code snippets (those live in repos, not the second brain)
 - Anything prefixed with "I'm thinking about maybe..."
+- **CRITICAL:** Never write to or edit `second brain/AI_CONTEXT.md`. That file is strictly managed by the `generate_context_snapshot` process and should not receive atomic updates from sessions.
 
 ## Step 3 — Plan where each nugget goes
 For each nugget, decide which file it belongs in. You have full freedom over file structure under `second brain/`. Good conventions:
