@@ -57,13 +57,53 @@ def create_note(filename: str, content: str) -> str:
 
 
 @mcp.tool()
-def search_notes(query: str) -> str:
+def overwrite_note(filename: str, content: str) -> str:
+    """
+    Creates or overwrites a markdown note in the vault.
+    Use this when you need to replace an existing file entirely (e.g. regenerating a snapshot).
+
+    Args:
+        filename: The name of the file (with or without .md extension)
+        content: The full text body to write into the file
+    """
+    try:
+        ensure_path()
+
+        if not filename.endswith(".md"):
+            filename += ".md"
+
+        note_path = VAULT_PATH / filename
+
+        if not note_path.is_relative_to(VAULT_PATH):
+            return "Error: Access denied — path is outside the vault."
+
+        note_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(note_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        action = "Overwrote" if note_path.exists() else "Created"
+        return f"{action} note: {filename}"
+
+    except Exception as e:
+        return f"Error writing note: {str(e)}"
+
+
+@mcp.tool()
+def search_notes(query: str, folder: str = ".") -> str:
     """
     Searches notes based on a specific query string.
+
+    Args:
+        query: The search term to look for
+        folder: Optional folder to scope the search (relative to vault root). Defaults to entire vault.
     """
     ensure_path()
+    search_dir = VAULT_PATH / folder
+    if not search_dir.exists():
+        return "Folder not found."
     matches = []
-    for path in VAULT_PATH.rglob("*.md"):
+    for path in search_dir.rglob("*.md"):
         try:
             if query.lower() in path.read_text(encoding="utf-8").lower():
                 matches.append(str(path.relative_to(VAULT_PATH)))
@@ -90,6 +130,31 @@ def list_notes(folder: str = ".") -> str:
             files.append(p.name)
 
     return "\n".join(sorted(files))
+
+
+@mcp.tool()
+def list_notes_recursive(folder: str = ".") -> str:
+    """
+    Lists all markdown files under a folder recursively.
+    Returns paths relative to the vault root so they can be passed directly to get_note.
+    Skips the templates/ directory.
+
+    Args:
+        folder: The folder to search (relative to vault root). Defaults to entire vault.
+    """
+    ensure_path()
+    target_dir = VAULT_PATH / folder
+    if not target_dir.exists():
+        return "Folder not found."
+
+    files = []
+    for path in sorted(target_dir.rglob("*.md")):
+        # Skip anything inside a templates/ directory
+        if "templates" in [p.lower() for p in path.parts]:
+            continue
+        files.append(str(path.relative_to(VAULT_PATH)))
+
+    return "\n".join(files) if files else "No notes found."
 
 
 @mcp.tool()
