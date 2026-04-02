@@ -1,55 +1,85 @@
-# Obsidian Brain Dump MCP
+# Obsidian Brain Dump & Context MCP
 
-hi, this is just a cool simple mcp server that connects Claude to my Obsidian vault.
+A modular MCP (Model Context Protocol) server connecting Claude to your Obsidian vault. 
+What started as a simple script to automatically organize messy class notes has evolved into a full **Vault Brain** system. It turns your Obsidian notes into a persistent, provider-agnostic AI context layer.
 
-basically, it takes a "brain dump" of notes (like the messy ones i take during class when i'm typing fast), automatically reformats them into clean markdown, and saves them directly to my vault.
+## Core Features
 
-it was a great intro for me to learn how mcp servers work and honestly i thought it was pretty cool so here we are.
+- **Read & Write Vault Notes**: Give Claude native access to read, append, search, and overwrite any notes in your vault.
+- **Bulk & Batch Operations**: Uses optimized `BulkUpdate` tools and batch-reading functions to perform operations efficiently, massively reducing UI latency and API token usage.
+- **Seamless Incremental Indexing**: Uses native modification timestamps (`MTime`) inside a lightweight `_index.md` file. Claude syncs changes efficiently without constantly re-reading your entire vault.
+- **Synthesis Engine**: Distills chat sessions into atomic knowledge nuggets and generates a portable `AI_CONTEXT.md` file designed to bootstrap cross-AI workflows securely without manual copy-pasting.
 
-## how to set it up
+## The "Second Brain" Workflow & Prompts
+The server provides specialized prompts (accessible via the Claude Desktop attachment menu) to automate your note-taking lifecycle.
 
-you can set this up yourself to run with claude desktop. here is the workflow:
+1. **`organize_notes`**
+   - **Use case**: Cleaning up messy, unstructured text.
+   - **What it does**: Takes raw text, reformats it into clean Markdown (with headers, bullet points, and even Mermaid.js diagrams), and saves it directly to a file in your vault.
+2. **`distill_session`**
+   - **Use case**: Run this at the end of a long brainstorming session. 
+   - **What it does**: Harvests atomic "knowledge nuggets" from the conversation, presents you with a dry-run preview, and bulk-saves the approved facts directly into your second brain directory while updating `_index.md`.
+3. **`rebuild_index`**
+   - **Use case**: Run this after you've manually edited files in your Obsidian vault.
+   - **What it does**: Performs a smart increment scan. It compares disk file timestamps against the internal `_index.md`, pulling in and summarizing only the files that changed. 
+4. **`generate_context_snapshot`**
+   - **Use case**: Run this periodically to synthesize your vault's state.
+   - **What it does**: Compiles a concise `AI_CONTEXT.md` file representing Who You Are, Active Projects, Priorities, and Recent Decisions. This artifact can be safely pasted cold into ChatGPT, Gemini, or new Claude sessions so you never have to re-explain yourself.
 
-1. get the code
+## Server Architecture
+Built using standard Python tooling and `mcp` libraries, the codebase is modularized:
+- **`mcp_instance.py`**: Central FastMCP initialization.
+- **`resources.py`**: Exposes read-only `note://{name}` URIs.
+- **`tools.py`**: Exposes utility functions (`get_note`, `search_notes`) and bulk actions (`get_notes_batch`, `update_notes_bulk`).
+- **`prompts.py`**: Exposes the logic for the predefined agent workflows (distill, snapshot, rebuild).
+- **`models.py`**: Pydantic schemas validating correct bulk-update parameters.
 
-first clone the repo:
-```
+---
+
+## Setup Instructions
+
+### 1. Clone the Repo
+```bash
 git clone <your-repo-url>
 cd <your-repo-folder>
 ```
 
-2. handle the python stuff (uv)
-
-i used uv for this because it's way faster than pip. if you have uv installed, just run this command to install the dependencies (it creates the virtual env for you):
-```
+### 2. Install Dependencies (via uv)
+Because it relies on the modern Python ecosystem, `uv` is heavily recommended for dependency management.
+```bash
 uv sync
 ```
+*(This automatically creates a virtual environment and installs `mcp`, `python-dotenv`, and other required packages.)*
 
-(if you don't have uv, you can just install mcp and python-dotenv with normal pip, but uv is recommended).
-
-3. connect your vault
-
-create a file named .env in this folder and paste in the path to your obsidian vault (or wherever you want notes to go to):
-```
+### 3. Connect your Obsidian Vault
+Create a `.env` file in the root of the cloned repository and set your absolute vault path:
+```env
 OBSIDIAN_VAULT_PATH="C:\Users\YourName\Documents\ObsidianVault"
 ```
 
-4. add to claude desktop
+### 4. Add to Claude Desktop
+You must register the MCP server with the Claude app configuration. Open the config file:
+- **Windows**: `AppData\Roaming\Claude\claude_desktop_config.json`
 
-make sure you have the claude desktop app installed first. then, just run this command in your terminal:
+Add the following entry under `mcpServers`:
+```json
+{
+  "mcpServers": {
+    "Notes": {
+      "command": "C:\\Users\\YourName\\.local\\bin\\uv.EXE",
+      "args": [
+        "run",
+        "--directory",
+        "C:\\Users\\YourName\\mcp_test",
+        "python",
+        "-m",
+        "mcp_server_notes"
+      ]
+    }
+  }
+}
 ```
-uv run mcp install main.py
-```
+**CRITICAL**: You *must* update `YourName` in both the `command` and `--directory` argument to point to your absolute UV path and repository clone path, respectively.
 
-this will automatically find your claude config file and register the server for you. restart claude desktop and you should your mcp server running in settings -> developer
-
-## how to use it
-
-this is the fun part.
-1. open a chat in claude.
-2. click the plus button.
-3. select add from notes.
-4. select organize notes.
-5. put in a filename (like lecture-1) and paste your messy brain dump in the other box.
-
-claude will clean it up, make headers/bullets, and save the file to your folder automatically!
+### 5. Restart Claude
+Fully restart Claude Desktop and now you should see your mcp server running in (+) -> Connectors.

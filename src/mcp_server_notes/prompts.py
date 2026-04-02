@@ -41,77 +41,34 @@ def distill_session() -> str:
 Today is {today}. Extract and save the most valuable knowledge from this conversation into my second brain.
 
 ## Step 1 — Survey the vault
-Call `list_notes_recursive` with folder="second brain" to see what files currently exist.
-If "_index.md" appears in the list, call `get_note("second brain/_index")` to understand how the vault is organized.
+Call `list_notes_recursive` with folder="second brain" to get the list of files and their modification times (`mtime`).
+If "_index.md" exists, call `get_note("second brain/_index")` to understand the current state.
 
 ## Step 2 — Extract nuggets from this conversation
-Scan the conversation and extract only what's worth persisting long-term. Be ruthless.
+Scan the conversation for extractive facts. Do not write to `second brain/AI_CONTEXT.md`.
 
-**Extract:**
-- Decisions made (with brief rationale)
-- Project status changes, blockers resolved, next actions clarified
-- New ideas or concepts worth revisiting later
-- Shifts in priorities
-- Persistent facts about me (background, constraints, goals)
+## Step 3 — Plan writes
+For each nugget, decide if you need to `create` (new) or `append` (exists).
+Important: For any file you write to, capture the **current disk mtime** from Step 1 (or assume it will update).
 
-**Do NOT extract:**
-- Exploratory back-and-forth that didn't land anywhere
-- Things I already knew before this conversation started
-- Code snippets (those live in repos, not the second brain)
-- Anything prefixed with "I'm thinking about maybe..."
-- **CRITICAL:** Never write to or edit `second brain/AI_CONTEXT.md`. That file is strictly managed by the `generate_context_snapshot` process and should not receive atomic updates from sessions.
+## Step 4 — Show dry-run preview
+Stop and show the table of intended changes.
 
-## Step 3 — Plan where each nugget goes
-For each nugget, decide which file it belongs in. You have full freedom over file structure under `second brain/`. Good conventions:
-- `second brain/decisions.md` — running log of decisions
-- `second brain/projects/<project-name>.md` — one file per project
-- `second brain/about.md` — persistent background facts about me
-- `second brain/ideas.md` — ideas worth revisiting
-- Or any other structure that fits the content
-
-Check if the target file already exists (from Step 1). Pick the right tool:
-- File exists → `append_to_note`
-- File doesn't exist → `create_note`
-
-Each nugget format:
-```
-**[{today}]** [1-2 sentence atomic fact. Specific names, numbers, context. No vague summaries.]
-```
-
-## Step 4 — Show dry-run preview (DO NOT WRITE YET)
-Present this table and stop — do not write anything until I respond:
-
-```
-Here's what I'd save from this session:
-
-| # | Target file | Action | Content |
-|---|---|---|---|
-| 1 | second brain/decisions.md | append | **[{today}]** ... |
-| 2 | second brain/projects/vault-brain.md | create | **[{today}]** ... |
-
-Reply "looks good" to save all, give me numbers to skip (e.g. "skip 2"),
-or tell me to reword anything. You can also say "add [content] to [file]"
-to include something I missed.
-```
-
-## Step 5 — After I respond, write approved items
-Apply any changes I requested, then write only the approved nuggets using `append_to_note` or `create_note`.
+## Step 5 — Write approved items
+Execute all writes in a SINGLE `update_notes_bulk` call.
 
 ## Step 6 — Update _index.md
-After all writes are complete:
-1. Read current index: `get_note("second brain/_index")` if it exists, otherwise start fresh
-2. Add or update one entry for every file you just wrote to:
-
+Include the `_index.md` update in the SAME `update_notes_bulk` call:
+1. Read current index.
+2. Add or update entries for the files you just modified:
 ```markdown
 ### second brain/[filename].md
-- Topics: [comma-separated keywords]
+- Topics: [keywords]
 - Last updated: {today}
-- Summary: [one sentence — what kind of info lives in this file]
+- MTime: [mtime from list_notes_recursive]
+- Summary: [sentence]
 ```
-
-3. Call `overwrite_note("second brain/_index", ...)` with the full updated index
-
-Confirm how many nuggets were saved and list the files that changed.
+3. Overwrite `second brain/_index.md` with the new content.
 """
 
 
@@ -128,37 +85,23 @@ def rebuild_index() -> str:
 Today is {today}. Rebuild the second brain index from scratch.
 
 ## Step 1 — Discover all notes
-Call `list_notes_recursive("second brain")`.
+Call `list_notes_recursive("second brain")`. You will receive a JSON list of `{path, mtime}`.
 
-Ignore these files entirely (don't read them, don't index them):
-- `second brain/_index.md`
-- `second brain/AI_CONTEXT.md`
-- Anything in a `templates/` directory (already excluded by the tool)
+Ignore: `_index.md`, `AI_CONTEXT.md`.
 
-## Step 2 — Read each note
-For every file in the list, call `get_note(filename)` to read its full content.
+## Step 2 — Compare with existing Index
+1. Call `get_note("second brain/_index")`.
+2. For each file in the vault, check if its **current `mtime`** is greater than the **`MTime`** recorded in your current index.
+3. Identify "Stale" files: any file that is new OR has a newer disk `mtime`.
 
-## Step 3 — Build the index
-Produce a new `_index.md` with this structure:
+## Step 3 — Batch Read Stale Notes
+Call `get_notes_batch([list of stale files])`. Do NOT read files that are up-to-date.
 
-```markdown
-# Second Brain Index
-_Last rebuilt: {today}_
+## Step 4 — Save the Index
+Rebuild the full `_index.md` by merging your existing index with the new info.
+Ensure every file entry has its current `MTime` recorded.
 
-## Files
-
-### second brain/[filename].md
-- Topics: [comma-separated keywords extracted from content]
-- Last updated: [most recent **[YYYY-MM-DD]** datestamp found in the file, or "{today}" if none]
-- Summary: [one sentence — what kind of information lives in this file]
-```
-
-Order entries by last updated date, most recent first.
-
-## Step 4 — Save
-Call `overwrite_note("second brain/_index", ...)` with the full index markdown.
-
-Report how many files were indexed.
+Report how many files were updated/synced.
 """
 
 
@@ -194,7 +137,7 @@ Skip any file that:
 - Was last updated more than 60 days ago AND is about transient things (projects, priorities)
 - Is in the `templates/` directory
 
-Call `get_note(...)` for only the selected files — do not read everything.
+Call `get_notes_batch(filenames)` for only the selected files — do not read them individually.
 
 ## Step 3 — Synthesize
 Produce a single, concise document using EXACTLY this structure:

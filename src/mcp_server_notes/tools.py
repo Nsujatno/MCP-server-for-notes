@@ -1,5 +1,42 @@
 from .mcp_instance import mcp
 from .config import VAULT_PATH, ensure_path
+from .models import BulkUpdate
+import json
+
+
+@mcp.tool()
+def get_notes_batch(filenames: list[str]) -> str:
+    """
+    Reads multiple notes from the vault in a single tool call.
+    Returns a JSON mapping of filename to its content.
+
+    Args:
+        filenames: A list of note names (with or without .md extension)
+    """
+    ensure_path()
+    results = {}
+
+    for name in filenames:
+        original_name = name
+        if not name.endswith(".md"):
+            name += ".md"
+
+        note_path = VAULT_PATH / name
+
+        if not note_path.is_relative_to(VAULT_PATH):
+            results[original_name] = "Error: Access denied — path is outside the vault."
+            continue
+
+        if not note_path.exists():
+            results[original_name] = f"Error: Note '{name}' not found."
+            continue
+
+        try:
+            results[original_name] = note_path.read_text(encoding="utf-8")
+        except Exception as e:
+            results[original_name] = f"Error reading note: {str(e)}"
+
+    return json.dumps(results, indent=2)
 
 
 @mcp.tool()
@@ -90,6 +127,65 @@ def overwrite_note(filename: str, content: str) -> str:
 
 
 @mcp.tool()
+def update_notes_bulk(bulk_update: BulkUpdate) -> str:
+    """
+    Performs multiple file operations (create, append, overwrite) in a single tool call.
+    Useful for saving multiple nuggets or updating the index together.
+
+    Args:
+        bulk_update: A collection of file updates (filename, content, type)
+    """
+    ensure_path()
+    results = []
+
+    for update in bulk_update.updates:
+        filename = update.filename
+        content = update.content
+        update_type = update.type
+
+        if not filename or content is None:
+            results.append(f"Skipping update: missing filename or content.")
+            continue
+
+        if not filename.endswith(".md"):
+            filename += ".md"
+
+        note_path = VAULT_PATH / filename
+
+        if not note_path.is_relative_to(VAULT_PATH):
+            results.append(f"Error for '{filename}': Access denied.")
+            continue
+
+        try:
+            note_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if update_type == "create":
+                if note_path.exists():
+                    results.append(f"Error for '{filename}': Use 'overwrite' to replace existing file.")
+                else:
+                    note_path.write_text(content, encoding="utf-8")
+                    results.append(f"Created note: {filename}")
+            elif update_type == "overwrite":
+                action = "Overwrote" if note_path.exists() else "Created"
+                note_path.write_text(content, encoding="utf-8")
+                results.append(f"{action} note: {filename}")
+            elif update_type == "append":
+                if not note_path.exists():
+                    note_path.write_text(content, encoding="utf-8")
+                    results.append(f"Created note (append-mode): {filename}")
+                else:
+                    with open(note_path, "a", encoding="utf-8") as f:
+                        f.write("\n" + content)
+                    results.append(f"Appended to note: {filename}")
+            else:
+                results.append(f"Error for '{filename}': Invalid update_type '{update_type}'.")
+        except Exception as e:
+            results.append(f"Error for '{filename}': {str(e)}")
+
+    return "\n".join(results)
+
+
+@mcp.tool()
 def search_notes(query: str, folder: str = ".") -> str:
     """
     Searches notes based on a specific query string.
@@ -135,8 +231,8 @@ def list_notes(folder: str = ".") -> str:
 @mcp.tool()
 def list_notes_recursive(folder: str = ".") -> str:
     """
-    Lists all markdown files under a folder recursively.
-    Returns paths relative to the vault root so they can be passed directly to get_note.
+    Lists all markdown files under a folder recursively with their modification times.
+    Returns a JSON string containing a list of objects with 'path' and 'mtime'.
     Skips the templates/ directory.
 
     Args:
@@ -147,14 +243,17 @@ def list_notes_recursive(folder: str = ".") -> str:
     if not target_dir.exists():
         return "Folder not found."
 
-    files = []
+    notes = []
     for path in sorted(target_dir.rglob("*.md")):
         # Skip anything inside a templates/ directory
         if "templates" in [p.lower() for p in path.parts]:
             continue
-        files.append(str(path.relative_to(VAULT_PATH)))
+        
+        rel_path = str(path.relative_to(VAULT_PATH))
+        mtime = path.stat().st_mtime
+        notes.append({"path": rel_path, "mtime": mtime})
 
-    return "\n".join(files) if files else "No notes found."
+    return json.dumps(notes, indent=2)
 
 
 @mcp.tool()
