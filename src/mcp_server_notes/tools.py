@@ -3,6 +3,29 @@ from .config import VAULT_PATH, ensure_path
 
 
 @mcp.tool()
+def get_note(note_name: str) -> str:
+    """
+    Reads and returns the contents of a note from the vault.
+
+    Args:
+        note_name: The name of the note (with or without .md extension)
+    """
+    ensure_path()
+    if not note_name.endswith(".md"):
+        note_name += ".md"
+
+    note_path = VAULT_PATH / note_name
+
+    if not note_path.is_relative_to(VAULT_PATH):
+        return "Error: Access denied — path is outside the vault."
+
+    if not note_path.exists():
+        return f"Error: Note '{note_name}' not found."
+
+    return note_path.read_text(encoding="utf-8")
+
+
+@mcp.tool()
 def create_note(filename: str, content: str) -> str:
     """
     Creates a new markdown note in the vault.

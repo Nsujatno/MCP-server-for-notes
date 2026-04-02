@@ -1,5 +1,5 @@
 from .mcp_instance import mcp
-from .resources import get_note
+from .tools import get_note
 
 
 @mcp.prompt()
